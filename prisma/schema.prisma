@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  clerkUserId         String    @unique // Clerk user ID
+  email               String    @unique
+  name                String?
+  imageUrl            String?
+  phoneNumber         String?   // For MFA or notifications
+  languagePreference  String?   @default("en")
+  currencyPreference  String?   @default("USD")
+  transactions        Transaction[]
+  accounts           Account[]
+  budgets            Budget[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Account {
+  id               String        @id @default(uuid())
+  name             String
+  type             AccountType
+  balance          Decimal       @default(0)
+  isDefault        Boolean       @default(false)
+  currency         String        @default("USD") 
+  description      String?      
+  status           AccountStatus @default(ACTIVE)
+  icon             String?       
+  accountNumber    String?       
+  interestRate     Decimal?      @default(0) // For savings accounts
+  goalAmount       Decimal?      // Savings goal amount
+  lastTransactionAt DateTime?  
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions     Transaction[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  type              TransactionType
+  amount            Decimal
+  description       String?
+  date              DateTime
+  category          String           
+  receiptUrl        String?
+  isRecurring       Boolean           @default(false)
+  recurringInterval RecurringInterval? // Only used if isRecurring is true
+  nextRecurringDate DateTime?         // Next date for recurring transaction
+  lastProcessed     DateTime?         // Last time this recurring transaction was processed
+  status            TransactionStatus  @default(COMPLETED)
+  paymentMethod     PaymentMethod      @default(CASH)
+  merchant          String?           // Store name or online merchant
+  splitWithUsers    Json?             // To split transactions among multiple users
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId         String
+  account           Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([accountId])
+  @@map("transactions")
+}
+
+model Budget {
+  id          String       @id @default(uuid())
+  amount      Decimal
+  category    String?      // Specific category budget
+  startDate   DateTime
+  endDate     DateTime
+  lastAlertSent DateTime?  // Track when the last alert was sent
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+  @@map("budgets")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum AccountType {
+  CURRENT
+  SAVINGS
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum RecurringInterval {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  UPI
+}
